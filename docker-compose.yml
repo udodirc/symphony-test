@@ -1,13 +1,60 @@
+version: "3.7"
+
 services:
-    sio_test:
-        user: app
-        build:
-            context: .
-            args:
-                USER_ID: ${USER_ID}
+    nginx:
+        container_name: sio-nginx
+        image: nginx:latest
         ports:
-            - "8337:8337"
+            - "4545:80"
+            - "4546:443"
+        networks:
+            - sio
         volumes:
-            - .:/app:rw
+            - ./docker/nginx:/etc/nginx/conf.d/
+#            - ./storage:/storage
+#            - ./public/docs:/public/docs
+        depends_on:
+            - php
+
+    php:
+        container_name: sio-php
+        build:
+            context: ./
+            dockerfile: docker/fpm/Dockerfile
+        working_dir: /api
+        ports:
+            - "127.0.0.1:8000:9000"
+        networks:
+            - sio
+        restart: always
+        volumes:
+            - ./.:/api
         environment:
-            - APP_ENV=dev
+            PHP_IDE_CONFIG: "serverName=sio.local"
+
+    db:
+        container_name: sio-db
+        image: mysql:latest
+        volumes:
+            - sio-db-vol:/var/lib/mysql
+        environment:
+            MYSQL_USER: sio
+            MYSQL_PASSWORD: sio
+            MYSQL_DATABASE: sio
+            MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+        command: [
+            "--log_bin_trust_function_creators=1",
+            "--sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
+        ]
+        ports:
+            - 3306:3306
+        networks:
+            - sio
+        restart: always
+
+networks:
+    sio:
+        driver: bridge
+
+volumes:
+    sio-db-vol:
